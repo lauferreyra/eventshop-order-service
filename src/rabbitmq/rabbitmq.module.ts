@@ -1,25 +1,9 @@
 import { Module } from '@nestjs/common';
-import {
-  ClientsModule,
-  Transport,
-} from '@nestjs/microservices';
+
+import { RabbitmqService } from './rabbitmq.service.js';
 
 @Module({
-  imports: [
-    ClientsModule.register([
-      {
-        name: 'RABBITMQ_SERVICE',
-        transport: Transport.RMQ,
-        options: {
-          urls: ['amqp://admin:admin@localhost:5672'],
-          queue: 'notification_queue',
-          queueOptions: {
-            durable: true,
-          },
-        },
-      },
-    ]),
-  ],
-  exports: [ClientsModule],
+  providers: [RabbitmqService],
+  exports: [RabbitmqService],
 })
 export class RabbitmqModule {}

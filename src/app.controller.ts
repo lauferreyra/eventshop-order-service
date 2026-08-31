@@ -1,17 +1,16 @@
 import {
   Body,
   Controller,
-  Inject,
   Post,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 
-import { ClientProxy } from '@nestjs/microservices';
+import { RabbitmqService } from './rabbitmq/rabbitmq.service.js';
 
 @Controller()
 export class AppController {
   constructor(
-    @Inject('RABBITMQ_SERVICE')
-    private readonly rabbitClient: ClientProxy,
+    private readonly rabbitmqService: RabbitmqService,
   ) {}
 
   @Post('orders')
@@ -24,14 +23,17 @@ export class AppController {
     },
   ) {
     const order = {
-      id: crypto.randomUUID(),
+      id: randomUUID(),
       eventName: body.eventName,
       email: body.email,
       quantity: body.quantity,
       status: 'PENDING',
     };
 
-    this.rabbitClient.emit('order.created', order);
+    this.rabbitmqService.publish(
+      'order.created',
+      order,
+    );
 
     return order;
   }
