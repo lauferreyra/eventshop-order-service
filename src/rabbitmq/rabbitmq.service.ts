@@ -27,21 +27,24 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
     console.log('✅ Order Service conectado a RabbitMQ');
   }
 
-  publish<T>(routingKey: string, payload: T) {
-    const message = Buffer.from(
-      JSON.stringify(payload),
-    );
+publish<T>(routingKey: string, payload: T) {
+  const message = Buffer.from(
+    JSON.stringify({
+      pattern: routingKey,
+      data: payload,
+    }),
+  );
 
-    this.channel.publish(
-      this.exchange,
-      routingKey,
-      message,
-      {
-        persistent: true,
-        contentType: 'application/json',
-      },
-    );
-  }
+  this.channel.publish(
+    this.exchange,
+    routingKey,
+    message,
+    {
+      persistent: true,
+      contentType: 'application/json',
+    },
+  );
+}
 
   async onModuleDestroy() {
     await this.channel?.close();
