@@ -82,12 +82,13 @@ export class RedisService
 
   async eval<T>(
     script: string,
-    numKeys: number,
-    ...args: string[]
+    keys: string[],
+    args: string[],
   ): Promise<T> {
     return this.redis.eval(
       script,
-      numKeys,
+      keys.length,
+      ...keys,
       ...args,
     ) as T;
   }
