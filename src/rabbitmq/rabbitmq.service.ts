@@ -59,10 +59,18 @@ export class RabbitmqService
   publish<T>(
     eventType: string,
     data: T,
+    correlationId: string,
   ) {
     /*
-     * Generamos el ID del evento
-     * en el momento de publicarlo.
+     * Generamos el ID del evento.
+     *
+     * IMPORTANTE:
+     *
+     * eventId != correlationId
+     *
+     * eventId identifica ESTE evento.
+     *
+     * correlationId identifica TODA la operación.
      */
 
     const event = {
@@ -76,6 +84,8 @@ export class RabbitmqService
       occurredAt:
         new Date().toISOString(),
 
+      correlationId,
+
       data,
     };
 
@@ -85,11 +95,13 @@ export class RabbitmqService
      *
      * {
      *   pattern: 'order.created',
+     *
      *   data: {
      *     eventId,
      *     eventType,
      *     version,
      *     occurredAt,
+     *     correlationId,
      *     data
      *   }
      * }

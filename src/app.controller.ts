@@ -1,8 +1,9 @@
 import {
   Body,
   Controller,
+  Headers,
   Post,
-  UseGuards
+  UseGuards,
 } from '@nestjs/common';
 
 import { randomUUID } from 'crypto';
@@ -10,17 +11,15 @@ import { randomUUID } from 'crypto';
 import {
   RabbitmqService,
 } from './rabbitmq/rabbitmq.service.js';
-import { RateLimit } from './rate-limit/rate-limit.decorator.js';
 
+import { RateLimit } from './rate-limit/rate-limit.decorator.js';
 import { RateLimitGuard } from './rate-limit/rate-limit.guard.js';
 
 @Controller()
 export class AppController {
   constructor(
-    private readonly rabbitmqService:
-      RabbitmqService,
+    private readonly rabbitmqService: RabbitmqService,
   ) {}
-
 
   @Post('orders')
   @UseGuards(RateLimitGuard)
@@ -33,55 +32,30 @@ export class AppController {
     @Body()
     body: {
       eventName: string;
-
       email: string;
-
       quantity: number;
     },
+
+    @Headers('X-Correlation-ID')
+    correlationId: string,
   ) {
-
-    /*
-     * Creamos nuestra orden.
-     *
-     * Este ID identifica a la ORDEN,
-     * no al evento RabbitMQ.
-     */
-
     const order = {
-      id:
-        randomUUID(),
+      id: randomUUID(),
 
-      eventName:
-        body.eventName,
+      eventName: body.eventName,
 
-      email:
-        body.email,
+      email: body.email,
 
-      quantity:
-        body.quantity,
+      quantity: body.quantity,
 
-      status:
-        'PENDING',
+      status: 'PENDING',
     };
-
-
-    /*
-     * Publicamos order.created.
-     *
-     * RabbitmqService se encarga
-     * de construir el EventEnvelope.
-     */
 
     this.rabbitmqService.publish(
       'order.created',
-
       order,
+      correlationId,
     );
-
-
-    /*
-     * La API devuelve la orden.
-     */
 
     return order;
   }
