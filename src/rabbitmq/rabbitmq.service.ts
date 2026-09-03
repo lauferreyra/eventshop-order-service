@@ -27,27 +27,31 @@ export class RabbitmqService
     'eventshop.events';
 
 
-  async onModuleInit() {
-    this.connection =
-      await amqp.connect(
-        'amqp://admin:admin@localhost:5672',
-      );
+async onModuleInit() {
+  const rabbitmqUrl =
+    process.env.RABBITMQ_URL ??
+    'amqp://admin:admin@localhost:5672';
 
-    this.channel =
-      await this.connection.createChannel();
-
-    await this.channel.assertExchange(
-      this.exchange,
-      'topic',
-      {
-        durable: true,
-      },
+  this.connection =
+    await amqp.connect(
+      rabbitmqUrl,
     );
 
-    console.log(
-      '✅ Order Service conectado a RabbitMQ',
-    );
-  }
+  this.channel =
+    await this.connection.createChannel();
+
+  await this.channel.assertExchange(
+    this.exchange,
+    'topic',
+    {
+      durable: true,
+    },
+  );
+
+  console.log(
+    '✅ Order Service conectado a RabbitMQ',
+  );
+}
 
 
   /*

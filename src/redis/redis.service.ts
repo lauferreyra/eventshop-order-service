@@ -10,24 +10,46 @@ import { Redis } from 'ioredis';
 export class RedisService
   implements OnModuleInit, OnModuleDestroy
 {
-  private redis!: Redis;
+  private redis: Redis;
 
   async onModuleInit() {
     this.redis = new Redis({
-      host: 'localhost',
-      port: 6379,
+      host:
+        process.env.REDIS_HOST ??
+        'localhost',
+
+      port:
+        Number(
+          process.env.REDIS_PORT ??
+            6379,
+        ),
     });
 
-    await this.redis.ping();
-
-    console.log('✅ Order Redis conectado');
+    console.log(
+      `✅ Redis conectado a ${process.env.REDIS_HOST ?? 'localhost'}:${process.env.REDIS_PORT ?? 6379}`,
+    );
   }
 
   async set(
     key: string,
     value: string,
-  ): Promise<void> {
-    await this.redis.set(key, value);
+    ttl?: number,
+  ) {
+    if (ttl) {
+      await this.redis.set(
+        key,
+        value,
+        'EX',
+        ttl,
+      );
+
+      return;
+    }
+
+    await this.redis.set(
+      key,
+      value,
+    );
   }
 
   async get(
@@ -38,15 +60,15 @@ export class RedisService
 
   async delete(
     key: string,
-  ): Promise<void> {
-    await this.redis.del(key);
+  ) {
+    return this.redis.del(key);
   }
 
   async expire(
     key: string,
     seconds: number,
-  ): Promise<void> {
-    await this.redis.expire(
+  ) {
+    return this.redis.expire(
       key,
       seconds,
     );
@@ -54,24 +76,23 @@ export class RedisService
 
   async ttl(
     key: string,
-  ): Promise<number> {
+  ) {
     return this.redis.ttl(key);
   }
 
-  async eval(
+  async eval<T>(
     script: string,
-    keys: string[],
-    args: string[],
-  ): Promise<unknown> {
+    numKeys: number,
+    ...args: string[]
+  ): Promise<T> {
     return this.redis.eval(
       script,
-      keys.length,
-      ...keys,
+      numKeys,
       ...args,
-    );
+    ) as T;
   }
 
   async onModuleDestroy() {
-    await this.redis.quit();
+    await this.redis?.quit();
   }
 }
