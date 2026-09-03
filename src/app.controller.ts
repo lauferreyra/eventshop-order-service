@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Post,
+  UseGuards
 } from '@nestjs/common';
 
 import { randomUUID } from 'crypto';
@@ -9,7 +10,9 @@ import { randomUUID } from 'crypto';
 import {
   RabbitmqService,
 } from './rabbitmq/rabbitmq.service.js';
+import { RateLimit } from './rate-limit/rate-limit.decorator.js';
 
+import { RateLimitGuard } from './rate-limit/rate-limit.guard.js';
 
 @Controller()
 export class AppController {
@@ -20,6 +23,12 @@ export class AppController {
 
 
   @Post('orders')
+  @UseGuards(RateLimitGuard)
+  @RateLimit({
+    limit: 5,
+    windowSeconds: 60,
+    identifier: 'ip',
+  })
   createOrder(
     @Body()
     body: {
