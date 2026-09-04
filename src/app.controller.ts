@@ -393,21 +393,87 @@ async handlePaymentFailed(
       return;
     }
 
-    await this.prisma.order.update({
-      where: {
-        id: order.id,
-      },
+    /*
+     * =====================================================
+     * TRANSACTION
+     * =====================================================
+     *
+     * Order FAILED
+     * +
+     * inventory.release en Outbox
+     *
+     * Todo ocurre dentro de la misma transaction.
+     */
 
-      data: {
-        status: 'FAILED',
+    await this.prisma.$transaction(
+      async (tx) => {
+        /*
+         * 1. Actualizar orden
+         */
+
+        await tx.order.update({
+          where: {
+            id: order.id,
+          },
+
+          data: {
+            status: 'FAILED',
+          },
+        });
+
+        /*
+         * 2. Crear evento de compensación
+         */
+
+        const eventId =
+          randomUUID();
+
+        await tx.outboxEvent.create({
+          data: {
+            eventId,
+
+            eventType:
+              'inventory.release',
+
+            payload: {
+              eventId,
+
+              eventType:
+                'inventory.release',
+
+              version: 1,
+
+              occurredAt:
+                new Date().toISOString(),
+
+              correlationId:
+                event.correlationId,
+
+              data: {
+                orderId:
+                  order.id,
+              },
+            },
+
+            status: 'PENDING',
+          },
+        });
+
+        console.log(
+          '📦 Outbox inventory.release creado:',
+          eventId,
+        );
       },
-    });
+    );
+
+    /*
+     * =====================================================
+     * TRANSACTION COMMIT
+     * =====================================================
+     */
 
     console.log(
-      '❌ Orden actualizada a FAILED:',
-      order.id,
-      'Motivo:',
-      event.data.reason,
+      '✅ Order FAILED + inventory.release COMMIT',
     );
 
     channel.ack(message);

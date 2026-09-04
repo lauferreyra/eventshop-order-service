@@ -48,3 +48,14 @@ export interface PaymentFailedEnvelope {
     reason: string;
   };
 }
+
+export interface InventoryReleaseEnvelope {
+  eventId: string;
+  eventType: 'inventory.release';
+  version: number;
+  occurredAt: string;
+  correlationId: string;
+  data: {
+    orderId: string;
+  };
+}
