@@ -9,12 +9,27 @@ import {
   UseGuards,
 } from '@nestjs/common';
 
+import {
+  Ctx,
+  EventPattern,
+  Payload,
+  RmqContext,
+} from '@nestjs/microservices';
+
 import { randomUUID } from 'crypto';
 
 import { PrismaService } from './prisma/prisma.service.js';
+
 import { RabbitmqService } from './rabbitmq/rabbitmq.service.js';
+
 import { RateLimit } from './rate-limit/rate-limit.decorator.js';
+
 import { RateLimitGuard } from './rate-limit/rate-limit.guard.js';
+
+import type {
+  InventoryRejectedEnvelope,
+  InventoryReservedEnvelope,
+} from './events/events.js';
 
 @Controller()
 export class AppController {
@@ -80,5 +95,166 @@ export class AppController {
     }
 
     return order;
+  }
+
+  @EventPattern('inventory.reserved')
+async handleInventoryReserved(
+  @Payload()
+  event: InventoryReservedEnvelope,
+
+  @Ctx()
+  context: any,
+) {
+  const channel =
+    context.getChannelRef();
+
+  const message =
+    context.getMessage();
+
+    try {
+      console.log(
+        '🎟️ Order Service recibió inventory.reserved',
+      );
+
+      const order =
+        await this.prisma.order.findUnique({
+          where: {
+            id: event.data.orderId,
+          },
+        });
+
+      if (!order) {
+        console.error(
+          '❌ Orden no encontrada:',
+          event.data.orderId,
+        );
+
+        channel.ack(message);
+
+        return;
+      }
+
+      if (
+        order.status !== 'PENDING'
+      ) {
+        console.log(
+          '♻️ Orden ya procesada:',
+          order.id,
+          order.status,
+        );
+
+        channel.ack(message);
+
+        return;
+      }
+
+      await this.prisma.order.update({
+        where: {
+          id: order.id,
+        },
+
+        data: {
+          status: 'RESERVED',
+        },
+      });
+
+      console.log(
+        '✅ Orden actualizada a RESERVED:',
+        order.id,
+      );
+
+      channel.ack(message);
+    } catch (error) {
+      console.error(
+        '❌ Error procesando inventory.reserved',
+        error,
+      );
+
+      channel.nack(
+        message,
+        false,
+        false,
+      );
+    }
+  }
+
+ @EventPattern('inventory.rejected')
+async handleInventoryRejected(
+  @Payload()
+  event: InventoryRejectedEnvelope,
+
+  @Ctx()
+  context: any,
+) {
+  const channel =
+    context.getChannelRef();
+
+  const message =
+    context.getMessage();
+
+    try {
+      console.log(
+        '❌ Order Service recibió inventory.rejected',
+      );
+
+      const order =
+        await this.prisma.order.findUnique({
+          where: {
+            id: event.data.orderId,
+          },
+        });
+
+      if (!order) {
+        console.error(
+          '❌ Orden no encontrada:',
+          event.data.orderId,
+        );
+
+        channel.ack(message);
+
+        return;
+      }
+
+      if (
+        order.status === 'FAILED'
+      ) {
+        console.log(
+          '♻️ Orden ya marcada como FAILED:',
+          order.id,
+        );
+
+        channel.ack(message);
+
+        return;
+      }
+
+      await this.prisma.order.update({
+        where: {
+          id: order.id,
+        },
+
+        data: {
+          status: 'FAILED',
+        },
+      });
+
+      console.log(
+        '❌ Orden actualizada a FAILED:',
+        order.id,
+      );
+
+      channel.ack(message);
+    } catch (error) {
+      console.error(
+        '❌ Error procesando inventory.rejected',
+        error,
+      );
+
+      channel.nack(
+        message,
+        false,
+        false,
+      );
+    }
   }
 }

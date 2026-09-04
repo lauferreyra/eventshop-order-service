@@ -1,0 +1,72 @@
+import {
+  Injectable,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
+
+import * as amqp from 'amqplib';
+
+import {
+  Channel,
+  ChannelModel,
+} from 'amqplib';
+
+@Injectable()
+export class RabbitmqTopologyService
+  implements OnModuleInit, OnModuleDestroy
+{
+  private connection: ChannelModel;
+  private channel: Channel;
+
+  async onModuleInit() {
+    const rabbitmqUrl =
+      process.env.RABBITMQ_URL ??
+      'amqp://admin:admin@localhost:5672';
+
+    this.connection =
+      await amqp.connect(rabbitmqUrl);
+
+    this.channel =
+      await this.connection.createChannel();
+
+    await this.createTopology();
+
+    console.log(
+      '✅ Topología RabbitMQ de Order configurada',
+    );
+  }
+
+  private async createTopology() {
+    await this.channel.assertExchange(
+      'eventshop.events',
+      'topic',
+      {
+        durable: true,
+      },
+    );
+
+    await this.channel.assertQueue(
+      'order_queue',
+      {
+        durable: true,
+      },
+    );
+
+    await this.channel.bindQueue(
+      'order_queue',
+      'eventshop.events',
+      'inventory.reserved',
+    );
+
+    await this.channel.bindQueue(
+      'order_queue',
+      'eventshop.events',
+      'inventory.rejected',
+    );
+  }
+
+  async onModuleDestroy() {
+    await this.channel?.close();
+    await this.connection?.close();
+  }
+}
