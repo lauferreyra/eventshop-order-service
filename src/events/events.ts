@@ -25,3 +25,26 @@ export interface InventoryRejectedEnvelope {
     reason: string;
   };
 }
+
+export interface PaymentCompletedEnvelope {
+  eventId: string;
+  eventType: 'payment.completed';
+  version: number;
+  occurredAt: string;
+  correlationId: string;
+  data: {
+    orderId: string;
+  };
+}
+
+export interface PaymentFailedEnvelope {
+  eventId: string;
+  eventType: 'payment.failed';
+  version: number;
+  occurredAt: string;
+  correlationId: string;
+  data: {
+    orderId: string;
+    reason: string;
+  };
+}

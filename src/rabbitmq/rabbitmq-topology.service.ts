@@ -63,6 +63,18 @@ export class RabbitmqTopologyService
       'eventshop.events',
       'inventory.rejected',
     );
+
+    await this.channel.bindQueue(
+        'order_queue',
+        'eventshop.events',
+        'payment.completed',
+        );
+
+        await this.channel.bindQueue(
+        'order_queue',
+        'eventshop.events',
+        'payment.failed',
+        );
   }
 
   async onModuleDestroy() {

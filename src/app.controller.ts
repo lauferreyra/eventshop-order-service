@@ -29,6 +29,8 @@ import { RateLimitGuard } from './rate-limit/rate-limit.guard.js';
 import type {
   InventoryRejectedEnvelope,
   InventoryReservedEnvelope,
+  PaymentCompletedEnvelope,
+  PaymentFailedEnvelope,
 } from './events/events.js';
 
 @Controller()
@@ -257,4 +259,169 @@ async handleInventoryRejected(
       );
     }
   }
+
+  @EventPattern('payment.completed')
+async handlePaymentCompleted(
+  @Payload()
+  event: PaymentCompletedEnvelope,
+
+  @Ctx()
+  context: any,
+) {
+  const rmqContext =
+    context as RmqContext;
+
+  const channel =
+    rmqContext.getChannelRef();
+
+  const message =
+    rmqContext.getMessage();
+
+  try {
+    console.log(
+      '💳 Order Service recibió payment.completed',
+    );
+
+    const order =
+      await this.prisma.order.findUnique({
+        where: {
+          id: event.data.orderId,
+        },
+      });
+
+    if (!order) {
+      console.error(
+        '❌ Orden no encontrada:',
+        event.data.orderId,
+      );
+
+      channel.ack(message);
+
+      return;
+    }
+
+    if (order.status !== 'RESERVED') {
+      console.log(
+        '♻️ Orden no está en RESERVED:',
+        order.id,
+        order.status,
+      );
+
+      channel.ack(message);
+
+      return;
+    }
+
+    await this.prisma.order.update({
+      where: {
+        id: order.id,
+      },
+
+      data: {
+        status: 'COMPLETED',
+      },
+    });
+
+    console.log(
+      '✅ Orden actualizada a COMPLETED:',
+      order.id,
+    );
+
+    channel.ack(message);
+  } catch (error) {
+    console.error(
+      '❌ Error procesando payment.completed',
+      error,
+    );
+
+    channel.nack(
+      message,
+      false,
+      false,
+    );
+  }
+}
+
+@EventPattern('payment.failed')
+async handlePaymentFailed(
+  @Payload()
+  event: PaymentFailedEnvelope,
+
+  @Ctx()
+  context: any,
+) {
+  const rmqContext =
+    context as RmqContext;
+
+  const channel =
+    rmqContext.getChannelRef();
+
+  const message =
+    rmqContext.getMessage();
+
+  try {
+    console.log(
+      '❌ Order Service recibió payment.failed',
+    );
+
+    const order =
+      await this.prisma.order.findUnique({
+        where: {
+          id: event.data.orderId,
+        },
+      });
+
+    if (!order) {
+      console.error(
+        '❌ Orden no encontrada:',
+        event.data.orderId,
+      );
+
+      channel.ack(message);
+
+      return;
+    }
+
+    if (order.status === 'FAILED') {
+      console.log(
+        '♻️ Orden ya marcada como FAILED:',
+        order.id,
+      );
+
+      channel.ack(message);
+
+      return;
+    }
+
+    await this.prisma.order.update({
+      where: {
+        id: order.id,
+      },
+
+      data: {
+        status: 'FAILED',
+      },
+    });
+
+    console.log(
+      '❌ Orden actualizada a FAILED:',
+      order.id,
+      'Motivo:',
+      event.data.reason,
+    );
+
+    channel.ack(message);
+  } catch (error) {
+    console.error(
+      '❌ Error procesando payment.failed',
+      error,
+    );
+
+    channel.nack(
+      message,
+      false,
+      false,
+    );
+  }
+}
 }
